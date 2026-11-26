@@ -30,7 +30,7 @@ Use the existing technologies:
 - React
 - TypeScript
 - Tailwind CSS
-- PostgreSQL (Neon)
+- PostgreSQL (Neon) 
 - Drizzle ORM
 - Drizzle Kit for database migrations
 - Zod for validation
