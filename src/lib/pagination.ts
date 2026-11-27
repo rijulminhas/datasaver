@@ -1,7 +1,7 @@
 // Shared pagination settings and helpers (safe for server and client code).
 
-/** Items per page in every list: 16 fills a 4×4 card grid exactly. */
-export const PAGE_SIZE = 16;
+/** Items per page in every list: 20 fills a 4-column card grid exactly (5 rows). */
+export const PAGE_SIZE = 20;
 
 const MAX_PAGE = 100_000;
 
