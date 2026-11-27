@@ -9,6 +9,7 @@ import { categorizeMimeType, type FileCategory } from "@/lib/files/categories";
 import { detectMimeType, SIGNATURE_SAMPLE_BYTES } from "@/lib/files/detect";
 import { getExtension, sanitizeFileName } from "@/lib/files/names";
 import { getPreviewKind, isMediaPreview } from "@/lib/files/preview";
+import { PAGE_SIZE, resolvePage, type PageInfo } from "@/lib/pagination";
 import { getStorage } from "@/lib/storage";
 import { storageConfig } from "@/lib/storage/config";
 
@@ -306,22 +307,48 @@ export async function listFiles(
   const rows = await db
     .select()
     .from(files)
-    .where(
-      and(
-        eq(files.userId, userId),
-        eq(files.status, "ready"),
-        isNull(files.deletedAt),
-        options.category ? eq(files.category, options.category) : undefined,
-        options.folderId === undefined
-          ? undefined
-          : options.folderId === null
-            ? isNull(files.folderId)
-            : eq(files.folderId, options.folderId)
-      )
-    )
-    .orderBy(desc(files.createdAt))
+    .where(libraryWhere(userId, options))
+    .orderBy(desc(files.createdAt), desc(files.id))
     .limit(Math.min(Math.max(options.limit ?? 100, 1), 500));
   return rows.map(toFileDto);
+}
+
+type LibraryFilter = { category?: FileCategory; folderId?: string | null };
+
+/** Ready, non-trashed files of the user, optionally by category and/or folder. */
+function libraryWhere(userId: string, options: LibraryFilter) {
+  return and(
+    eq(files.userId, userId),
+    eq(files.status, "ready"),
+    isNull(files.deletedAt),
+    options.category ? eq(files.category, options.category) : undefined,
+    options.folderId === undefined
+      ? undefined
+      : options.folderId === null
+        ? isNull(files.folderId)
+        : eq(files.folderId, options.folderId)
+  );
+}
+
+/** One page of library files (newest first) plus paging info. Out-of-range pages clamp to the last page. */
+export async function listFilesPage(
+  userId: string,
+  options: LibraryFilter & { page: number; pageSize?: number }
+): Promise<PageInfo & { files: FileDto[] }> {
+  const where = libraryWhere(userId, options);
+  const [totalRow] = await db.select({ value: count() }).from(files).where(where);
+  const info = resolvePage(options.page, totalRow?.value ?? 0, options.pageSize ?? PAGE_SIZE);
+  const rows =
+    info.total === 0
+      ? []
+      : await db
+          .select()
+          .from(files)
+          .where(where)
+          .orderBy(desc(files.createdAt), desc(files.id))
+          .limit(info.pageSize)
+          .offset(info.offset);
+  return { files: rows.map(toFileDto), page: info.page, pageCount: info.pageCount, pageSize: info.pageSize, total: info.total };
 }
 
 // ---------------------------------------------------------------------------
@@ -361,6 +388,38 @@ export async function listTrash(userId: string) {
     .orderBy(desc(files.deletedAt))
     .limit(500);
   return rows.map(toFileDto);
+}
+
+/** One page of Trash (most recently deleted first), plus the total size of everything in Trash. */
+export async function listTrashPage(
+  userId: string,
+  options: { page: number; pageSize?: number }
+): Promise<PageInfo & { files: FileDto[]; totalBytes: number }> {
+  await purgeExpiredTrash(userId);
+  const where = and(eq(files.userId, userId), eq(files.status, "ready"), isNotNull(files.deletedAt));
+  const [totals] = await db
+    .select({ value: count(), bytes: sql<string>`coalesce(sum(${files.size}), 0)` })
+    .from(files)
+    .where(where);
+  const info = resolvePage(options.page, totals?.value ?? 0, options.pageSize ?? PAGE_SIZE);
+  const rows =
+    info.total === 0
+      ? []
+      : await db
+          .select()
+          .from(files)
+          .where(where)
+          .orderBy(desc(files.deletedAt), desc(files.id))
+          .limit(info.pageSize)
+          .offset(info.offset);
+  return {
+    files: rows.map(toFileDto),
+    totalBytes: Number(totals?.bytes ?? 0),
+    page: info.page,
+    pageCount: info.pageCount,
+    pageSize: info.pageSize,
+    total: info.total,
+  };
 }
 
 /**
@@ -425,4 +484,54 @@ export async function purgeExpiredTrash(userId: string) {
   } catch {
     return 0; // Retried on the next visit.
   }
+}
+
+// ---------------------------------------------------------------------------
+// Bulk operations. Each takes up to MAX_BULK_FILES ids, silently ignores ids
+// that don't belong to the user (or aren't in the right state), and returns
+// how many files were actually affected.
+// ---------------------------------------------------------------------------
+
+export const MAX_BULK_FILES = 500;
+
+function assertBulkIds(fileIds: string[]) {
+  if (fileIds.length === 0) throw new FileServiceError(400, "Select at least one file.");
+  if (fileIds.length > MAX_BULK_FILES) throw new FileServiceError(400, `Select at most ${MAX_BULK_FILES} files at a time.`);
+}
+
+/** Move many library files to Trash. */
+export async function moveManyToTrash(userId: string, fileIds: string[]) {
+  assertBulkIds(fileIds);
+  const now = new Date();
+  const rows = await db
+    .update(files)
+    .set({ deletedAt: now, updatedAt: now })
+    .where(and(eq(files.userId, userId), inArray(files.id, fileIds), eq(files.status, "ready"), isNull(files.deletedAt)))
+    .returning({ id: files.id });
+  if (rows.length === 0) throw new FileServiceError(404, "None of the selected files were found.");
+  return rows.length;
+}
+
+/** Restore many files from Trash. */
+export async function restoreManyFromTrash(userId: string, fileIds: string[]) {
+  assertBulkIds(fileIds);
+  await purgeExpiredTrash(userId);
+  const rows = await db
+    .update(files)
+    .set({ deletedAt: null, updatedAt: new Date() })
+    .where(and(eq(files.userId, userId), inArray(files.id, fileIds), isNotNull(files.deletedAt)))
+    .returning({ id: files.id });
+  if (rows.length === 0) throw new FileServiceError(404, "None of the selected files were found in Trash.");
+  return rows.length;
+}
+
+/** Permanently delete many files (from the library or Trash). Storage first, then rows. */
+export async function deleteManyPermanently(userId: string, fileIds: string[]) {
+  assertBulkIds(fileIds);
+  const rows = await db
+    .select({ id: files.id, storageKey: files.storageKey })
+    .from(files)
+    .where(and(eq(files.userId, userId), inArray(files.id, fileIds), eq(files.status, "ready")));
+  if (rows.length === 0) throw new FileServiceError(404, "None of the selected files were found.");
+  return removePermanently(userId, rows);
 }

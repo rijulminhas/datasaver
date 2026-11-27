@@ -7,9 +7,10 @@ export const metadata: Metadata = {
   title: "Videos",
 };
 
-export default function Page() {
+export default function Page({ searchParams }: PageProps<"/dashboard/videos">) {
   return (
     <LibraryPage
+      searchParams={searchParams}
       title="Videos"
       description="Your videos: MP4, MOV, MKV, WEBM and more."
       icon={VideoIcon}

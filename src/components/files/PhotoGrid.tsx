@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { BulkCheckbox, useBulk } from "@/components/files/BulkSelection";
 import { LibraryFileActions } from "@/components/files/FileActions";
 import { FilePreviewProvider, usePreview } from "@/components/files/FilePreview";
 import { ImageIcon } from "@/components/ui/icons";
@@ -24,15 +25,30 @@ export default function PhotoGrid({ files }: { files: FileDto[] }) {
 
 function PhotoTile({ file }: { file: FileDto }) {
   const open = usePreview();
+  const bulk = useBulk();
+  const selecting = !!bulk?.action;
+  const checked = !!bulk?.isSelected(file.id);
   const [failed, setFailed] = useState(false);
   const renderable = getPreviewKind(file.mimeType) === "image" && !failed;
 
   return (
-    <li className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md" data-file-id={file.id}>
+    <li
+      className={`group relative overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:shadow-md ${
+        checked ? "border-indigo-500 ring-2 ring-indigo-500" : "border-slate-200"
+      }`}
+      data-file-id={file.id}
+    >
+      {selecting && (
+        <div className="absolute left-2 top-2 z-10 rounded-md bg-white/90 p-0.5 shadow-sm">
+          <BulkCheckbox fileId={file.id} fileName={file.name} />
+        </div>
+      )}
       <button
         type="button"
-        onClick={() => open(file.id)}
-        aria-label={`Open ${file.name}`}
+        // While selecting, clicking the photo selects it instead of opening it.
+        onClick={() => (selecting ? bulk?.toggle(file.id) : open(file.id))}
+        aria-label={selecting ? `${checked ? "Deselect" : "Select"} ${file.name}` : `Open ${file.name}`}
+        aria-pressed={selecting ? checked : undefined}
         className="relative block aspect-square w-full overflow-hidden bg-slate-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-indigo-300"
       >
         {renderable ? (

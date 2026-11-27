@@ -7,9 +7,10 @@ export const metadata: Metadata = {
   title: "Photos",
 };
 
-export default function Page() {
+export default function Page({ searchParams }: PageProps<"/dashboard/photos">) {
   return (
     <LibraryPage
+      searchParams={searchParams}
       title="Photos"
       description="Your images: JPG, PNG, WEBP, GIF and more."
       icon={ImageIcon}

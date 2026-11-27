@@ -7,9 +7,10 @@ export const metadata: Metadata = {
   title: "All Files",
 };
 
-export default function Page() {
+export default function Page({ searchParams }: PageProps<"/dashboard/files">) {
   return (
     <LibraryPage
+      searchParams={searchParams}
       title="All Files"
       description="Every file you've saved to DataSaver."
       icon={FilesIcon}

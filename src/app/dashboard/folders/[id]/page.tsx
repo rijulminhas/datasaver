@@ -5,6 +5,7 @@ import { Suspense } from "react";
 
 import EmptyState from "@/components/dashboard/EmptyState";
 import PageHeader from "@/components/dashboard/PageHeader";
+import { BulkActionsMenu, BulkProvider } from "@/components/files/BulkSelection";
 import FileTable from "@/components/files/FileTable";
 import UploadDialog from "@/components/files/UploadDialog";
 import AddExistingFilesButton from "@/components/folders/AddExistingFilesDialog";
@@ -12,9 +13,11 @@ import { FolderActions, NewFolderButton } from "@/components/folders/FolderActio
 import FolderGrid from "@/components/folders/FolderGrid";
 import { ChevronRightIcon, FolderIcon } from "@/components/ui/icons";
 import { FileTableSkeleton, PageHeaderSkeleton } from "@/components/ui/Loading";
+import Pagination, { PageSummary } from "@/components/ui/Pagination";
 import { fileIdSchema } from "@/lib/api/http";
 import { requireUser } from "@/lib/auth/dal";
-import { FileServiceError, listFiles } from "@/lib/files/service";
+import { FileServiceError, listFilesPage } from "@/lib/files/service";
+import { parsePage } from "@/lib/pagination";
 import { getFolderPath, listFolders, MAX_FOLDER_DEPTH } from "@/lib/folders/service";
 import { storageConfig } from "@/lib/storage/config";
 
@@ -24,17 +27,17 @@ export const metadata: Metadata = {
 
 // Params are runtime data (no generateStaticParams), so they are read inside
 // Suspense, as Cache Components requires.
-export default function FolderPage({ params }: PageProps<"/dashboard/folders/[id]">) {
+export default function FolderPage({ params, searchParams }: PageProps<"/dashboard/folders/[id]">) {
   return (
     <Suspense fallback={<FolderSkeleton />}>
-      {params.then(({ id }) => (
-        <FolderContent id={id} />
+      {Promise.all([params, searchParams]).then(([{ id }, query]) => (
+        <FolderContent id={id} page={parsePage(query.page)} />
       ))}
     </Suspense>
   );
 }
 
-async function FolderContent({ id }: { id: string }) {
+async function FolderContent({ id, page }: { id: string; page: number }) {
   if (!fileIdSchema.safeParse(id).success) notFound();
 
   const user = await requireUser();
@@ -49,7 +52,11 @@ async function FolderContent({ id }: { id: string }) {
 
   const folder = path[path.length - 1];
   const parent = path.length > 1 ? path[path.length - 2] : null;
-  const [subfolders, files] = await Promise.all([listFolders(user.id, id), listFiles(user.id, { folderId: id, limit: 500 })]);
+  // Subfolders are navigation, so all are shown; files are paginated.
+  const [subfolders, { files, ...pageInfo }] = await Promise.all([
+    listFolders(user.id, id),
+    listFilesPage(user.id, { folderId: id, page }),
+  ]);
   const canNest = path.length < MAX_FOLDER_DEPTH;
 
   return (
@@ -84,13 +91,13 @@ async function FolderContent({ id }: { id: string }) {
 
       <PageHeader
         title={<span className="block truncate" title={folder.name}>{folder.name}</span>}
-        description={summary(subfolders.length, files.length)}
+        description={summary(subfolders.length, pageInfo.total)}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <FolderActions
               folderId={folder.id}
               folderName={folder.name}
-              fileCount={files.length}
+              fileCount={pageInfo.total}
               folderCount={subfolders.length}
               redirectAfterDelete={parent ? `/dashboard/folders/${parent.id}` : "/dashboard/folders"}
               labelled
@@ -102,7 +109,7 @@ async function FolderContent({ id }: { id: string }) {
         }
       />
 
-      {subfolders.length === 0 && files.length === 0 ? (
+      {subfolders.length === 0 && pageInfo.total === 0 ? (
         <EmptyState
           icon={FolderIcon}
           title="This folder is empty"
@@ -119,8 +126,17 @@ async function FolderContent({ id }: { id: string }) {
           )}
           {files.length > 0 && (
             <section aria-labelledby="files-heading">
-              <h2 id="files-heading" className="mb-3 text-sm font-semibold text-slate-700">Files</h2>
-              <FileTable files={files} mode="library" />
+              <BulkProvider fileIds={files.map((f) => f.id)} mode="library" currentFolderId={folder.id}>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="flex items-baseline gap-2">
+                    <h2 id="files-heading" className="text-sm font-semibold text-slate-700">Files</h2>
+                    {pageInfo.pageCount > 1 && <PageSummary {...pageInfo} noun={["file", "files"]} />}
+                  </div>
+                  <BulkActionsMenu />
+                </div>
+                <FileTable files={files} mode="library" />
+                <Pagination {...pageInfo} basePath={`/dashboard/folders/${folder.id}`} />
+              </BulkProvider>
             </section>
           )}
         </div>

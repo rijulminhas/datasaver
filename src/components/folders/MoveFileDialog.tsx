@@ -17,8 +17,13 @@ interface MoveFileDialogProps {
   fileIds: string[];
   /** Label for the toast, e.g. the file name or "3 files". */
   label: string;
-  /** The files' current folder (null = top level), shown as "Current". */
-  currentFolderId: string | null;
+  /**
+   * The files' current folder (null = top level), shown as "Current" and not
+   * selectable. Omit when the files come from different folders.
+   */
+  currentFolderId?: string | null;
+  /** Called after a successful move (e.g. to clear a bulk selection). */
+  onMoved?: () => void;
 }
 
 /** "Top level" first, then the folder tree. */
@@ -31,7 +36,7 @@ export default function MoveFileDialog(props: MoveFileDialogProps) {
   return props.open ? <MoveFileForm {...props} /> : null;
 }
 
-function MoveFileForm({ open, onClose, fileIds, label, currentFolderId }: MoveFileDialogProps) {
+function MoveFileForm({ onClose, fileIds, label, currentFolderId, onMoved }: MoveFileDialogProps) {
   const router = useRouter();
   const toast = useToast();
   const [folders, setFolders] = useState<FolderSummary[] | null>(null);
@@ -72,13 +77,14 @@ function MoveFileForm({ open, onClose, fileIds, label, currentFolderId }: MoveFi
     }
     setBusy(false);
     onClose();
+    onMoved?.();
     router.refresh();
     toast({ message: `Moved ${label} to ${selected === null ? "the top level" : `"${nameOf(selected)}"`}` });
   }
 
   return (
     <Modal
-      open={open}
+      open
       onClose={() => !busy && onClose()}
       title="Move to folder"
       description={`Choose where to move ${label}.`}

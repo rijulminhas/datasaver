@@ -1,3 +1,4 @@
+import { BulkCheckbox } from "@/components/files/BulkSelection";
 import { CATEGORY_ICONS } from "@/components/files/categoryIcons";
 import { LibraryFileActions, TrashFileActions } from "@/components/files/FileActions";
 import { FilePreviewProvider, FileThumb, PreviewTrigger } from "@/components/files/FilePreview";
@@ -37,9 +38,14 @@ export default function FileTable({ files, mode }: FileTableProps) {
             const Icon = CATEGORY_ICONS[file.category];
             const meta = CATEGORY_META[file.category];
             return (
-              <tr key={file.id} className="hover:bg-slate-50/70" data-file-id={file.id}>
+              <tr
+                key={file.id}
+                className="hover:bg-slate-50/70 has-[[data-bulk-checkbox]:checked]:bg-indigo-50/70"
+                data-file-id={file.id}
+              >
                 <td className="px-4 py-3 sm:px-5">
                   <div className="flex min-w-0 items-center gap-3">
+                    <BulkCheckbox fileId={file.id} fileName={file.name} />
                     {mode === "library" ? (
                       <FileThumb file={file} />
                     ) : (

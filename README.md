@@ -122,6 +122,7 @@ Click a file name (or thumbnail) to open the viewer; ← / → switch files.
 
 - `DELETE /api/files/[id]` moves a file to **Trash**. It can be restored (`POST /api/files/[id]/restore`) for **30 days**, then it is permanently deleted.
 - `DELETE /api/files/[id]?permanent=true` deletes a file forever immediately; `DELETE /api/files/trash` empties the Trash.
+- `POST /api/files/bulk` `{ action: "trash" | "restore" | "delete", fileIds }` applies one action to up to 500 of the user's files (others' ids are ignored). The UI exposes it through the **Bulk actions** menu on every file list (library pages, folders, Trash): pick an action, tick files, then confirm in the floating action bar. Bulk move uses `POST /api/files/move`.
 - Permanent deletion removes the object from storage first, then the database row.
 - Files in Trash still count toward the quota.
 - Expired Trash is purged when that user next uses the app (dashboard, Trash page, uploads). **Before production, add a scheduled job** so inactive users' expired files are purged too.

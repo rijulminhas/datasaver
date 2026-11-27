@@ -5,6 +5,7 @@ import { and, asc, count, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { files, folders } from "@/lib/db/schema";
 import { FileServiceError } from "@/lib/files/service";
+import { PAGE_SIZE, resolvePage, type PageInfo } from "@/lib/pagination";
 
 /**
  * Folder operations. Like the file service, every function takes the
@@ -125,22 +126,17 @@ async function getSubtreeIds(userId: string, folderId: string) {
   return result.rows.map((r) => r.id);
 }
 
-/** Direct children of a folder (or of the root when parentFolderId is null), A–Z, with counts. */
-export async function listFolders(userId: string, parentFolderId: string | null): Promise<FolderDto[]> {
-  if (parentFolderId) await getOwnedFolder(userId, parentFolderId);
+function childrenWhere(userId: string, parentFolderId: string | null) {
+  return and(
+    eq(folders.userId, userId),
+    parentFolderId ? eq(folders.parentFolderId, parentFolderId) : isNull(folders.parentFolderId)
+  );
+}
 
-  const rows = await db
-    .select()
-    .from(folders)
-    .where(
-      and(
-        eq(folders.userId, userId),
-        parentFolderId ? eq(folders.parentFolderId, parentFolderId) : isNull(folders.parentFolderId)
-      )
-    )
-    .orderBy(asc(sql`lower(${folders.name})`), asc(folders.name))
-    .limit(MAX_FOLDERS_PER_USER);
+const byName = [asc(sql`lower(${folders.name})`), asc(folders.name), asc(folders.id)] as const;
 
+/** Attach direct file and subfolder counts to folder rows. */
+async function withCounts(userId: string, rows: FolderRow[]): Promise<FolderDto[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
 
@@ -160,6 +156,41 @@ export async function listFolders(userId: string, parentFolderId: string | null)
   const filesBy = new Map(fileCounts.map((c) => [c.folderId, c.value]));
   const foldersBy = new Map(folderCounts.map((c) => [c.parentId, c.value]));
   return rows.map((row) => toFolderDto(row, filesBy.get(row.id) ?? 0, foldersBy.get(row.id) ?? 0));
+}
+
+/** Direct children of a folder (or of the root when parentFolderId is null), A–Z, with counts. */
+export async function listFolders(userId: string, parentFolderId: string | null): Promise<FolderDto[]> {
+  if (parentFolderId) await getOwnedFolder(userId, parentFolderId);
+  const rows = await db
+    .select()
+    .from(folders)
+    .where(childrenWhere(userId, parentFolderId))
+    .orderBy(...byName)
+    .limit(MAX_FOLDERS_PER_USER);
+  return withCounts(userId, rows);
+}
+
+/** One page of a folder's children (A–Z, with counts) plus paging info. */
+export async function listFoldersPage(
+  userId: string,
+  parentFolderId: string | null,
+  options: { page: number; pageSize?: number }
+): Promise<PageInfo & { folders: FolderDto[] }> {
+  if (parentFolderId) await getOwnedFolder(userId, parentFolderId);
+  const where = childrenWhere(userId, parentFolderId);
+  const [totalRow] = await db.select({ value: count() }).from(folders).where(where);
+  const info = resolvePage(options.page, totalRow?.value ?? 0, options.pageSize ?? PAGE_SIZE);
+  const rows =
+    info.total === 0
+      ? []
+      : await db.select().from(folders).where(where).orderBy(...byName).limit(info.pageSize).offset(info.offset);
+  return {
+    folders: await withCounts(userId, rows),
+    page: info.page,
+    pageCount: info.pageCount,
+    pageSize: info.pageSize,
+    total: info.total,
+  };
 }
 
 /** Every folder the user owns (id, name, parent) — for the "Move to" picker. */

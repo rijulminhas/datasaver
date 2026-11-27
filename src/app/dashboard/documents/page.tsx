@@ -7,9 +7,10 @@ export const metadata: Metadata = {
   title: "Documents",
 };
 
-export default function Page() {
+export default function Page({ searchParams }: PageProps<"/dashboard/documents">) {
   return (
     <LibraryPage
+      searchParams={searchParams}
       title="Documents"
       description="PDFs, Word, Excel, PowerPoint and text files."
       icon={FileTextIcon}

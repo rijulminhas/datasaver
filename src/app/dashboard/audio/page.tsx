@@ -7,9 +7,10 @@ export const metadata: Metadata = {
   title: "Audio",
 };
 
-export default function Page() {
+export default function Page({ searchParams }: PageProps<"/dashboard/audio">) {
   return (
     <LibraryPage
+      searchParams={searchParams}
       title="Audio"
       description="Your audio: MP3, WAV, AAC and more."
       icon={MusicIcon}
