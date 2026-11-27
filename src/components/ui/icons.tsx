@@ -330,3 +330,43 @@ export function TrashXIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function FolderPlusIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 10v6" />
+      <path d="M9 13h6" />
+      <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+    </Icon>
+  );
+}
+
+/** Folder with an arrow: "move to folder". */
+export function FolderInputIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2 9V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1" />
+      <path d="M2 13h10" />
+      <path d="m9 16 3-3-3-3" />
+    </Icon>
+  );
+}
+
+export function PencilIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5Z" />
+      <path d="m15 5 4 4" />
+    </Icon>
+  );
+}
+
+export function MoreVerticalIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="12" cy="5" r="1" />
+      <circle cx="12" cy="19" r="1" />
+    </Icon>
+  );
+}

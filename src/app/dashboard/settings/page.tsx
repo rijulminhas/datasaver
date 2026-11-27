@@ -5,6 +5,7 @@ import { Suspense, type ReactNode } from "react";
 import LogoutButton from "@/components/auth/LogoutButton";
 import PageHeader from "@/components/dashboard/PageHeader";
 import StorageUsage from "@/components/dashboard/StorageUsage";
+import { CardSkeleton } from "@/components/ui/Loading";
 import { requireUser } from "@/lib/auth/dal";
 import { getStorageOverview } from "@/lib/files/overview";
 
@@ -26,7 +27,7 @@ export default function SettingsPage() {
           </Link>
         </Section>
 
-        <Suspense fallback={<div className="h-64 animate-pulse rounded-2xl border border-slate-200 bg-white" />}>
+        <Suspense fallback={<CardSkeleton rows={3} label="Loading storage details…" />}>
           <StorageSection />
         </Suspense>
 

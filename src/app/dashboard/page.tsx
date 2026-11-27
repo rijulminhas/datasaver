@@ -5,6 +5,7 @@ import PageHeader from "@/components/dashboard/PageHeader";
 import RecentFiles from "@/components/dashboard/RecentFiles";
 import { CATEGORY_ICONS } from "@/components/files/categoryIcons";
 import UploadDialog from "@/components/files/UploadDialog";
+import { LoadingIndicator, PageHeaderSkeleton } from "@/components/ui/Loading";
 import StatCard from "@/components/dashboard/StatCard";
 import StorageUsage from "@/components/dashboard/StorageUsage";
 import { FilesIcon, HardDriveIcon, CloudIcon } from "@/components/ui/icons";
@@ -99,10 +100,11 @@ async function Overview() {
 }
 
 function OverviewSkeleton() {
-  const block = "animate-pulse rounded-2xl bg-white border border-slate-200";
+  const block = "animate-pulse rounded-2xl bg-slate-200/70";
   return (
-    <div aria-busy="true" aria-label="Loading dashboard">
-      <div className="mb-8 h-9 w-64 animate-pulse rounded-lg bg-slate-200" />
+    <div aria-busy="true">
+      <PageHeaderSkeleton />
+      <LoadingIndicator label="Loading your dashboard…" className="mb-4" />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {[0, 1, 2].map((i) => <div key={i} className={`h-32 ${block}`} />)}
       </div>

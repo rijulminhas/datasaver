@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import MoveFileDialog from "@/components/folders/MoveFileDialog";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import { DownloadIcon, RotateCcwIcon, SpinnerIcon, TrashIcon, TrashXIcon } from "@/components/ui/icons";
+import { DownloadIcon, FolderInputIcon, RotateCcwIcon, SpinnerIcon, TrashIcon, TrashXIcon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/Toast";
 
 const iconButtonBase =
@@ -25,9 +26,10 @@ interface Props {
 }
 
 /** Row actions for a file in the library. */
-export function LibraryFileActions({ fileId, fileName }: Props) {
+export function LibraryFileActions({ fileId, fileName, folderId }: Props & { folderId: string | null }) {
   const router = useRouter();
   const toast = useToast();
+  const [moveOpen, setMoveOpen] = useState(false);
   const [trashOpen, setTrashOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -61,6 +63,9 @@ export function LibraryFileActions({ fileId, fileName }: Props) {
       <a href={`/api/files/${fileId}/download`} className={iconButton} aria-label={`Download ${fileName}`} title="Download">
         <DownloadIcon width={16} height={16} />
       </a>
+      <button type="button" onClick={() => setMoveOpen(true)} className={iconButton} aria-label={`Move ${fileName} to a folder`} title="Move to folder">
+        <FolderInputIcon width={16} height={16} />
+      </button>
       <button type="button" onClick={() => setTrashOpen(true)} className={iconButton} aria-label={`Move ${fileName} to Trash`} title="Move to Trash">
         <TrashIcon width={16} height={16} />
       </button>
@@ -73,6 +78,14 @@ export function LibraryFileActions({ fileId, fileName }: Props) {
       >
         <TrashXIcon width={16} height={16} />
       </button>
+
+      <MoveFileDialog
+        open={moveOpen}
+        onClose={() => setMoveOpen(false)}
+        fileIds={[fileId]}
+        label={`"${fileName}"`}
+        currentFolderId={folderId}
+      />
 
       <ConfirmDialog
         open={trashOpen}

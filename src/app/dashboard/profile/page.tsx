@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import PageHeader from "@/components/dashboard/PageHeader";
 import { CalendarIcon, MailIcon, UserIcon } from "@/components/ui/icons";
+import { CardSkeleton } from "@/components/ui/Loading";
 import { getProfile } from "@/lib/auth/dal";
 import { formatDate } from "@/lib/format";
 
@@ -14,7 +15,7 @@ export default function ProfilePage() {
   return (
     <>
       <PageHeader title="Profile" description="Your personal account details." />
-      <Suspense fallback={<div className="h-72 animate-pulse rounded-2xl border border-slate-200 bg-white" />}>
+      <Suspense fallback={<CardSkeleton rows={3} label="Loading your profile…" />}>
         <ProfileCard />
       </Suspense>
     </>

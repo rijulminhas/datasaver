@@ -27,7 +27,7 @@ export default function FileTable({ files, mode }: FileTableProps) {
             <th scope="col" className="hidden w-36 px-4 py-3 text-right lg:table-cell">
               {mode === "trash" ? "Deleted forever in" : "Uploaded"}
             </th>
-            <th scope="col" className={`${mode === "trash" ? "w-24 sm:w-72" : "w-32"} px-4 py-3 text-right sm:pr-5`}>
+            <th scope="col" className={`${mode === "trash" ? "w-24 sm:w-72" : "w-40"} px-4 py-3 text-right sm:pr-5`}>
               <span className="sr-only">Actions</span>
             </th>
           </tr>
@@ -74,7 +74,7 @@ export default function FileTable({ files, mode }: FileTableProps) {
                   {mode === "trash" ? (
                     <TrashFileActions fileId={file.id} fileName={file.name} />
                   ) : (
-                    <LibraryFileActions fileId={file.id} fileName={file.name} />
+                    <LibraryFileActions fileId={file.id} fileName={file.name} folderId={file.folderId} />
                   )}
                 </td>
               </tr>

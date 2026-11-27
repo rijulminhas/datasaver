@@ -6,6 +6,7 @@ import PageHeader from "@/components/dashboard/PageHeader";
 import { EmptyTrashButton } from "@/components/files/FileActions";
 import FileTable from "@/components/files/FileTable";
 import { TrashIcon } from "@/components/ui/icons";
+import { FileTableSkeleton, PageHeaderSkeleton } from "@/components/ui/Loading";
 import { requireUser } from "@/lib/auth/dal";
 import { listTrash } from "@/lib/files/service";
 import { formatBytes } from "@/lib/format";
@@ -17,7 +18,14 @@ export const metadata: Metadata = {
 
 export default function TrashPage() {
   return (
-    <Suspense fallback={<div className="h-64 animate-pulse rounded-2xl border border-slate-200 bg-white" />}>
+    <Suspense
+      fallback={
+        <>
+          <PageHeaderSkeleton />
+          <FileTableSkeleton label="Loading Trash…" rows={4} />
+        </>
+      }
+    >
       <TrashContent />
     </Suspense>
   );

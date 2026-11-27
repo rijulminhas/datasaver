@@ -57,7 +57,7 @@ function PhotoTile({ file }: { file: FileDto }) {
           <p className="truncate text-sm font-medium text-slate-900" title={file.name}>{file.name}</p>
           <p className="text-xs text-slate-500">{formatBytes(file.size)}</p>
         </div>
-        <LibraryFileActions fileId={file.id} fileName={file.name} />
+        <LibraryFileActions fileId={file.id} fileName={file.name} folderId={file.folderId} />
       </div>
     </li>
   );

@@ -31,7 +31,7 @@ export const NAV_SECTIONS: { title?: string; items: NavItem[] }[] = [
       { label: "Videos", href: "/dashboard/videos", icon: VideoIcon },
       { label: "Documents", href: "/dashboard/documents", icon: FileTextIcon },
       { label: "Audio", href: "/dashboard/audio", icon: MusicIcon },
-      // { label: "Folders", href: "/dashboard/folders", icon: FolderIcon },
+      { label: "Folders", href: "/dashboard/folders", icon: FolderIcon },
       { label: "Trash", href: "/dashboard/trash", icon: TrashIcon },
     ],
   },

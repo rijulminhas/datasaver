@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 
 import { NAV_SECTIONS } from "@/components/app/nav";
 import Logo from "@/components/brand/Logo";
-import { MenuIcon, XIcon } from "@/components/ui/icons";
+import { MenuIcon, SpinnerIcon, XIcon } from "@/components/ui/icons";
 import { ToastProvider } from "@/components/ui/Toast";
 
 interface AppShellProps {
@@ -17,22 +17,28 @@ interface AppShellProps {
   storageWidget: ReactNode;
 }
 
-function isActive(pathname: string, href: string) {
+/** Spinner shown on a nav link while its page is loading (fixed size: no layout shift). */
+function NavPendingHint() {
+  const { pending } = useLinkStatus();
+  return (
+    <span className={`ml-auto transition-opacity ${pending ? "opacity-100" : "opacity-0"}`} aria-hidden="true">
+      <SpinnerIcon width={14} height={14} className="text-indigo-500" />
+    </span>
+  );
+}
+
+function isActive(pathname: string | null, href: string) {
+  if (pathname === null) return false;
   return href === "/dashboard" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function SidebarContent({ pathname, storageWidget, onNavigate }: {
-  pathname: string;
-  storageWidget: ReactNode;
-  onNavigate?: () => void;
-}) {
+/**
+ * The nav links. pathname = null renders them without an active highlight
+ * (used as the Suspense fallback while the URL is not known yet).
+ */
+function NavLinks({ pathname, onNavigate }: { pathname: string | null; onNavigate?: () => void }) {
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex h-16 shrink-0 items-center px-5">
-        <Logo href="/dashboard" />
-      </div>
-
-      <nav aria-label="Main" className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
+    <>
         {NAV_SECTIONS.map((section, index) => (
           <div key={section.title ?? index}>
             {section.title && (
@@ -57,6 +63,7 @@ function SidebarContent({ pathname, storageWidget, onNavigate }: {
                     >
                       <Icon width={18} height={18} className={active ? "text-indigo-600" : "text-slate-400"} />
                       {label}
+                      <NavPendingHint />
                     </Link>
                   </li>
                 );
@@ -64,6 +71,31 @@ function SidebarContent({ pathname, storageWidget, onNavigate }: {
             </ul>
           </div>
         ))}
+    </>
+  );
+}
+
+/**
+ * Reads the URL for the active highlight. Under Cache Components the URL of a
+ * route with a dynamic segment (e.g. /dashboard/folders/[id]) is runtime data,
+ * so usePathname() must sit inside <Suspense> or it blocks prerendering.
+ */
+function ActiveNavLinks({ onNavigate }: { onNavigate?: () => void }) {
+  const pathname = usePathname();
+  return <NavLinks pathname={pathname} onNavigate={onNavigate} />;
+}
+
+function SidebarContent({ storageWidget, onNavigate }: { storageWidget: ReactNode; onNavigate?: () => void }) {
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex h-16 shrink-0 items-center px-5">
+        <Logo href="/dashboard" />
+      </div>
+
+      <nav aria-label="Main" className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
+        <Suspense fallback={<NavLinks pathname={null} onNavigate={onNavigate} />}>
+          <ActiveNavLinks onNavigate={onNavigate} />
+        </Suspense>
       </nav>
 
       <div className="shrink-0 border-t border-slate-200 p-4">{storageWidget}</div>
@@ -72,7 +104,6 @@ function SidebarContent({ pathname, storageWidget, onNavigate }: {
 }
 
 export default function AppShell({ children, userMenu, storageWidget }: AppShellProps) {
-  const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Close the mobile drawer with Escape and lock page scroll while it's open.
@@ -93,7 +124,7 @@ export default function AppShell({ children, userMenu, storageWidget }: AppShell
     <div className="min-h-screen bg-slate-50">
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-slate-200 bg-white lg:block">
-        <SidebarContent pathname={pathname} storageWidget={storageWidget} />
+        <SidebarContent storageWidget={storageWidget} />
       </aside>
 
       {/* Mobile drawer */}
@@ -118,7 +149,6 @@ export default function AppShell({ children, userMenu, storageWidget }: AppShell
             <XIcon width={18} height={18} />
           </button>
           <SidebarContent
-            pathname={pathname}
             storageWidget={storageWidget}
             onNavigate={() => setDrawerOpen(false)}
           />

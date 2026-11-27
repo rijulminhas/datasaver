@@ -22,6 +22,10 @@ const MAX_CONCURRENT = 3;
 
 interface UploadDialogProps {
   maxFileBytes: number;
+  /** Upload into this folder (the server checks it belongs to the user). */
+  folderId?: string | null;
+  /** Shown in the dialog so it's clear where files will go. */
+  folderName?: string;
 }
 
 /**
@@ -30,7 +34,7 @@ interface UploadDialogProps {
  *   2. PUT file to storage (XHR)     → real upload progress
  *   3. POST /api/files/[id]/complete → server verifies size + file signature
  */
-export default function UploadDialog({ maxFileBytes }: UploadDialogProps) {
+export default function UploadDialog({ maxFileBytes, folderId = null, folderName }: UploadDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<UploadItem[]>([]);
@@ -66,7 +70,7 @@ export default function UploadDialog({ maxFileBytes }: UploadDialogProps) {
         const initRes = await fetch("/api/files/upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: item.file.name, size: item.file.size }),
+          body: JSON.stringify({ name: item.file.name, size: item.file.size, folderId }),
         });
         const init = await initRes.json().catch(() => ({}));
         if (!initRes.ok) throw new Error(init.message || "Couldn't start the upload.");
@@ -82,7 +86,16 @@ export default function UploadDialog({ maxFileBytes }: UploadDialogProps) {
           }
           xhr.upload.onprogress = (e) => e.lengthComputable && update(item.id, { progress: e.loaded / e.total });
           xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error("Storage rejected the upload. Please try again.")));
-          xhr.onerror = () => reject(new Error("Upload failed. Check your connection and try again."));
+          // A network-level failure is either the user being offline or the
+          // storage bucket blocking the request (e.g. a missing CORS rule).
+          xhr.onerror = () =>
+            reject(
+              new Error(
+                navigator.onLine
+                  ? "Couldn't reach file storage. Please try again later."
+                  : "You appear to be offline. Check your connection and try again."
+              )
+            );
           xhr.onabort = () => reject(new DOMException("Cancelled", "AbortError"));
           xhr.send(item.file);
         });
@@ -102,7 +115,7 @@ export default function UploadDialog({ maxFileBytes }: UploadDialogProps) {
         update(item.id, { status: "error", error: error instanceof Error ? error.message : "Upload failed." });
       }
     },
-    [router, update]
+    [router, update, folderId]
   );
 
   // Simple scheduler: keep up to MAX_CONCURRENT uploads running.
@@ -149,7 +162,7 @@ export default function UploadDialog({ maxFileBytes }: UploadDialogProps) {
         onClose={() => setOpen(false)}
         size="lg"
         title="Upload files"
-        description={`Photos, videos, documents, audio, archives and more · up to ${formatBytes(maxFileBytes)} per file`}
+        description={`${folderName ? `Into “${folderName}” · ` : ""}Photos, videos, documents, audio, archives and more · up to ${formatBytes(maxFileBytes)} per file`}
         footer={
           <>
             {!inProgress && items.length > 0 && (

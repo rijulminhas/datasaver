@@ -8,6 +8,8 @@ import { checkRateLimit } from "@/lib/rate-limit";
 const uploadSchema = z.object({
   name: z.string().trim().min(1, "File name is required").max(1024),
   size: z.number().int().min(1, "Empty files can't be uploaded").max(Number.MAX_SAFE_INTEGER),
+  /** Optional destination folder; must belong to the user. */
+  folderId: z.uuid().nullish(),
 });
 
 /**

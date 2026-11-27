@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, count, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { files } from "@/lib/db/schema";
+import { files, folders } from "@/lib/db/schema";
 import { categorizeMimeType, type FileCategory } from "@/lib/files/categories";
 import { detectMimeType, SIGNATURE_SAMPLE_BYTES } from "@/lib/files/detect";
 import { getExtension, sanitizeFileName } from "@/lib/files/names";
@@ -113,7 +113,7 @@ export async function cleanupExpiredUploads(userId: string) {
 }
 
 /** Step 1 of an upload: reserve quota and return a signed upload URL. */
-export async function createUpload(userId: string, input: { name: string; size: number }) {
+export async function createUpload(userId: string, input: { name: string; size: number; folderId?: string | null }) {
   const { maxFileBytes, quotaBytesPerUser, maxPendingUploadsPerUser } = storageConfig;
 
   if (input.size > maxFileBytes) {
@@ -121,6 +121,16 @@ export async function createUpload(userId: string, input: { name: string; size: 
   }
 
   await Promise.all([cleanupExpiredUploads(userId), purgeExpiredTrash(userId)]);
+
+  const folderId = input.folderId ?? null;
+  if (folderId) {
+    const [folder] = await db
+      .select({ id: folders.id })
+      .from(folders)
+      .where(and(eq(folders.id, folderId), eq(folders.userId, userId)))
+      .limit(1);
+    if (!folder) throw new FileServiceError(404, "Folder not found.");
+  }
 
   const [pending] = await db
     .select({ value: count() })
@@ -146,6 +156,7 @@ export async function createUpload(userId: string, input: { name: string; size: 
   await db.insert(files).values({
     id,
     userId,
+    folderId,
     originalName,
     storedName,
     storageKey,
@@ -284,8 +295,14 @@ export async function readTextPreview(userId: string, fileId: string) {
   return { text, truncated: row.size > limit, mimeType: row.mimeType };
 }
 
-/** Library files (not in Trash), newest first. */
-export async function listFiles(userId: string, options: { category?: FileCategory; limit?: number } = {}) {
+/**
+ * Library files (not in Trash), newest first.
+ * folderId: undefined = every folder, null = top level only, id = that folder only.
+ */
+export async function listFiles(
+  userId: string,
+  options: { category?: FileCategory; folderId?: string | null; limit?: number } = {}
+) {
   const rows = await db
     .select()
     .from(files)
@@ -294,7 +311,12 @@ export async function listFiles(userId: string, options: { category?: FileCatego
         eq(files.userId, userId),
         eq(files.status, "ready"),
         isNull(files.deletedAt),
-        options.category ? eq(files.category, options.category) : undefined
+        options.category ? eq(files.category, options.category) : undefined,
+        options.folderId === undefined
+          ? undefined
+          : options.folderId === null
+            ? isNull(files.folderId)
+            : eq(files.folderId, options.folderId)
       )
     )
     .orderBy(desc(files.createdAt))

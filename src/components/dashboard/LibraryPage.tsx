@@ -6,6 +6,7 @@ import FileTable from "@/components/files/FileTable";
 import PhotoGrid from "@/components/files/PhotoGrid";
 import UploadDialog from "@/components/files/UploadDialog";
 import type { FilesIcon } from "@/components/ui/icons";
+import { FileTableSkeleton, PhotoGridSkeleton } from "@/components/ui/Loading";
 import { requireUser } from "@/lib/auth/dal";
 import type { FileCategory } from "@/lib/files/categories";
 import { listFiles } from "@/lib/files/service";
@@ -27,7 +28,7 @@ export default function LibraryPage({ title, description, icon, emptyTitle, empt
   return (
     <>
       <PageHeader title={title} description={description} actions={<UploadDialog maxFileBytes={storageConfig.maxFileBytes} />} />
-      <Suspense fallback={<div className="h-64 animate-pulse rounded-2xl border border-slate-200 bg-white" />}>
+      <Suspense fallback={category === "photos" ? <PhotoGridSkeleton /> : <FileTableSkeleton label={`Loading ${title.toLowerCase()}…`} />}>
         <FileList category={category} icon={icon} emptyTitle={emptyTitle} emptyDescription={emptyDescription} />
       </Suspense>
     </>

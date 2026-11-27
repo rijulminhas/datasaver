@@ -35,7 +35,7 @@ Open http://localhost:3000 — `/` redirects to `/login`.
 | `STORAGE_QUOTA_BYTES` | no | per-user quota (default 1 GB) |
 | `STORAGE_MAX_FILE_BYTES` | no | max single file (default 100 MB) |
 
-The bucket must be **private** and needs a CORS rule allowing `PUT` (header `content-type`) from the app's origins — currently `http://localhost:3000` and `http://localhost:3100`. **Add the production domain before deploying.**
+The bucket must be **private** and needs a CORS rule allowing `PUT` (header `content-type`) from the app's origins — currently `http://localhost:3000`, `http://localhost:3100` and `https://datasaverhere.vercel.app`. Updating CORS rules replaces the whole list, so always pass every origin. Add any new domain (e.g. a custom domain) before using it.
 
 | Script | Purpose |
 | --- | --- |
@@ -126,10 +126,20 @@ Click a file name (or thumbnail) to open the viewer; ← / → switch files.
 - Files in Trash still count toward the quota.
 - Expired Trash is purged when that user next uses the app (dashboard, Trash page, uploads). **Before production, add a scheduled job** so inactive users' expired files are purged too.
 
+### Folders
+
+- Folders can be nested up to **10 levels** (max 1000 folders per user). Sibling names must be unique (enforced by a database constraint); names can't contain `/` or `\`.
+- Folders are metadata only: they never affect storage keys, so moving or renaming never touches stored objects.
+- `GET /api/folders` (top level, with counts) · `?parentId=<id>` (subfolders) · `?all=true` (every folder, for the "Move to" picker).
+- `POST /api/folders` `{ name, parentFolderId? }` · `GET /api/folders/[id]` (folder + breadcrumb path) · `PATCH /api/folders/[id]` `{ name }`.
+- `DELETE /api/folders/[id]` deletes the folder and its subfolders; every file inside is **moved to Trash** (never destroyed directly) and restores to the top level.
+- `POST /api/files/move` `{ fileIds, folderId | null }` moves up to 500 files; `POST /api/files/upload` accepts an optional `folderId`; `GET /api/files?folderId=<id|root>` filters by folder.
+- Every folder operation checks ownership; another user's folder behaves exactly like a missing one (404).
+
 ## Database
 
 Tables: `users`, `sessions`, `files`, `folders` (public schema) and `drizzle.__drizzle_migrations` (Drizzle's migration journal). Every `files`/`folders` row belongs to a user and is deleted with that user. **Note:** deleting a user row does not yet delete their objects from storage — an account-deletion feature must do that.
 
 ## Roadmap
 
-See `CLAUDE.md` for the full plan. Phases 1 (authentication UI), 2 (dashboard UI) and 3 (file storage, including Trash with 30-day recovery from Phase 5) are done. Next is Phase 4: search, sorting, folders, moving files and bulk actions.
+See `CLAUDE.md` for the full plan. Phases 1 (authentication UI), 2 (dashboard UI) and 3 (file storage, including Trash with 30-day recovery from Phase 5) are done. Phase 4 is in progress: folders and moving files are done; search, sorting and bulk actions are next.
