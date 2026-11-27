@@ -14,7 +14,7 @@ import { formatBytes } from "@/lib/format";
 export default function PhotoGrid({ files }: { files: FileDto[] }) {
   return (
     <FilePreviewProvider files={files}>
-      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 2xl:grid-cols-5" aria-label="Photos">
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4" aria-label="Photos">
         {files.map((file) => (
           <PhotoTile key={file.id} file={file} />
         ))}
