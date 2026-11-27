@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation";
 import Modal from "@/components/ui/Modal";
 import { CheckIcon, FolderIcon, HardDriveIcon, SpinnerIcon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/Toast";
+import InlineNewFolder from "@/components/folders/InlineNewFolder";
+import { buildFolderOptions, fetchAllFolders, type FolderSummary } from "@/lib/folders/tree";
 
-type FolderSummary = { id: string; name: string; parentFolderId: string | null };
 type Option = { id: string | null; label: string; depth: number };
 
 interface MoveFileDialogProps {
@@ -20,23 +21,9 @@ interface MoveFileDialogProps {
   currentFolderId: string | null;
 }
 
-/** Flatten folders into an indented A–Z tree, top level first. */
+/** "Top level" first, then the folder tree. */
 function buildOptions(folders: FolderSummary[]): Option[] {
-  const children = new Map<string | null, FolderSummary[]>();
-  for (const f of folders) {
-    const list = children.get(f.parentFolderId) ?? [];
-    list.push(f);
-    children.set(f.parentFolderId, list);
-  }
-  const out: Option[] = [{ id: null, label: "Top level (no folder)", depth: 0 }];
-  const visit = (parent: string | null, depth: number) => {
-    for (const f of children.get(parent) ?? []) {
-      out.push({ id: f.id, label: f.name, depth });
-      if (depth < 12) visit(f.id, depth + 1);
-    }
-  };
-  visit(null, 0);
-  return out;
+  return [{ id: null, label: "Top level (no folder)", depth: 0 }, ...buildFolderOptions(folders)];
 }
 
 /** Mounted only while open, so each opening starts fresh and reloads folders. */
@@ -55,12 +42,8 @@ function MoveFileForm({ open, onClose, fileIds, label, currentFolderId }: MoveFi
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/folders?all=true")
-      .then(async (res) => {
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.message || "Couldn't load your folders.");
-        if (!cancelled) setFolders(data.folders);
-      })
+    fetchAllFolders()
+      .then((list) => !cancelled && setFolders(list))
       .catch((e: Error) => !cancelled && setLoadError(e.message || "Couldn't load your folders."));
     return () => {
       cancelled = true;
@@ -157,9 +140,15 @@ function MoveFileForm({ open, onClose, fileIds, label, currentFolderId }: MoveFi
               );
             })}
           </ul>
-          {folders.length === 0 && (
-            <p className="mt-3 text-xs text-slate-500">You don&apos;t have any folders yet. Create one from the Folders page.</p>
-          )}
+          <div className="mt-3 flex flex-col gap-1.5">
+            {folders.length === 0 && <p className="text-xs text-slate-500">You don&apos;t have any folders yet — create one here.</p>}
+            <InlineNewFolder
+              onCreated={(folder) => {
+                setFolders((list) => [...(list ?? []), folder]);
+                setSelected(folder.id);
+              }}
+            />
+          </div>
         </>
       )}
       {error && <p className="mt-3 text-sm font-medium text-red-600" role="alert">{error}</p>}

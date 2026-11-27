@@ -134,6 +134,7 @@ Click a file name (or thumbnail) to open the viewer; ← / → switch files.
 - `POST /api/folders` `{ name, parentFolderId? }` · `GET /api/folders/[id]` (folder + breadcrumb path) · `PATCH /api/folders/[id]` `{ name }`.
 - `DELETE /api/folders/[id]` deletes the folder and its subfolders; every file inside is **moved to Trash** (never destroyed directly) and restores to the top level.
 - `POST /api/files/move` `{ fileIds, folderId | null }` moves up to 500 files; `POST /api/files/upload` accepts an optional `folderId`; `GET /api/files?folderId=<id|root>` filters by folder.
+- UI: the upload dialog has a **Save to** folder picker on every page (fixed to the current folder inside a folder); each folder page has **Add existing files** (search + type tabs + multi-select, built on `/api/files` and `/api/files/move`); every file has a **Move** button. Pickers can create a folder inline.
 - Every folder operation checks ownership; another user's folder behaves exactly like a missing one (404).
 
 ## Database

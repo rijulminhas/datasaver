@@ -7,6 +7,7 @@ import EmptyState from "@/components/dashboard/EmptyState";
 import PageHeader from "@/components/dashboard/PageHeader";
 import FileTable from "@/components/files/FileTable";
 import UploadDialog from "@/components/files/UploadDialog";
+import AddExistingFilesButton from "@/components/folders/AddExistingFilesDialog";
 import { FolderActions, NewFolderButton } from "@/components/folders/FolderActions";
 import FolderGrid from "@/components/folders/FolderGrid";
 import { ChevronRightIcon, FolderIcon } from "@/components/ui/icons";
@@ -95,6 +96,7 @@ async function FolderContent({ id }: { id: string }) {
               labelled
             />
             {canNest && <NewFolderButton parentFolderId={folder.id} />}
+            <AddExistingFilesButton folderId={folder.id} folderName={folder.name} />
             <UploadDialog maxFileBytes={storageConfig.maxFileBytes} folderId={folder.id} folderName={folder.name} />
           </div>
         }
@@ -104,7 +106,8 @@ async function FolderContent({ id }: { id: string }) {
         <EmptyState
           icon={FolderIcon}
           title="This folder is empty"
-          description="Upload files here, create a subfolder, or move existing files in with the folder button next to any file."
+          description="Upload new files here, or add files you’ve already saved — photos, videos, documents and more."
+          action={<AddExistingFilesButton folderId={folder.id} folderName={folder.name} />}
         />
       ) : (
         <div className="space-y-8">

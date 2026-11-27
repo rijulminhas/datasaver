@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import { useRouter } from "next/navigation";
 
+import InlineNewFolder from "@/components/folders/InlineNewFolder";
 import Modal from "@/components/ui/Modal";
-import { AlertCircleIcon, CheckCircleIcon, SpinnerIcon, UploadCloudIcon, XIcon } from "@/components/ui/icons";
+import { AlertCircleIcon, CheckCircleIcon, FolderIcon, SpinnerIcon, UploadCloudIcon, XIcon } from "@/components/ui/icons";
+import { buildFolderOptions, fetchAllFolders, type FolderSummary } from "@/lib/folders/tree";
 import { formatBytes } from "@/lib/format";
 
 type Status = "queued" | "uploading" | "verifying" | "done" | "error" | "cancelled";
@@ -16,13 +18,20 @@ type UploadItem = {
   progress: number; // 0..1
   error?: string;
   fileId?: string;
+  /** Destination chosen when the file was added (null = top level). */
+  folderId: string | null;
+  /** Destination name for the status line. */
+  folderLabel: string | null;
 };
 
 const MAX_CONCURRENT = 3;
 
 interface UploadDialogProps {
   maxFileBytes: number;
-  /** Upload into this folder (the server checks it belongs to the user). */
+  /**
+   * Upload into this folder (the server checks it belongs to the user). When
+   * set, the destination is fixed; otherwise the dialog shows a folder picker.
+   */
   folderId?: string | null;
   /** Shown in the dialog so it's clear where files will go. */
   folderName?: string;
@@ -43,24 +52,51 @@ export default function UploadDialog({ maxFileBytes, folderId = null, folderName
   const started = useRef(new Set<string>());
   const xhrs = useRef(new Map<string, XMLHttpRequest>());
 
+  // Destination picker (only when the page didn't fix a folder).
+  const fixedFolder = folderId !== null;
+  const [destination, setDestination] = useState<string | null>(folderId);
+  const [folders, setFolders] = useState<FolderSummary[] | null>(null);
+  const [foldersError, setFoldersError] = useState("");
+  const folderOptions = folders ? buildFolderOptions(folders) : [];
+  const destinationLabel = fixedFolder
+    ? folderName ?? "this folder"
+    : destination
+      ? folderOptions.find((o) => o.id === destination)?.path ?? null
+      : null;
+
+  useEffect(() => {
+    if (!open || fixedFolder) return;
+    let cancelled = false;
+    fetchAllFolders()
+      .then((list) => {
+        if (cancelled) return;
+        setFolders(list);
+        setFoldersError("");
+        // The selected folder may have been deleted meanwhile.
+        setDestination((current) => (current && !list.some((f) => f.id === current) ? null : current));
+      })
+      .catch((e: Error) => !cancelled && setFoldersError(e.message));
+    return () => {
+      cancelled = true;
+    };
+  }, [open, fixedFolder]);
+
   const update = useCallback((id: string, patch: Partial<UploadItem>) => {
     setItems((all) => all.map((item) => (item.id === id ? { ...item, ...patch } : item)));
   }, []);
 
-  const addFiles = useCallback(
-    (list: FileList | File[]) => {
-      const added: UploadItem[] = Array.from(list).map((file) => {
-        const base = { id: crypto.randomUUID(), file, progress: 0 };
-        if (file.size === 0) return { ...base, status: "error", error: "Empty files can't be uploaded." };
-        if (file.size > maxFileBytes) {
-          return { ...base, status: "error", error: `Too large — the limit is ${formatBytes(maxFileBytes)} per file.` };
-        }
-        return { ...base, status: "queued" };
-      });
-      setItems((all) => [...all, ...added]);
-    },
-    [maxFileBytes]
-  );
+  // Each file keeps the destination selected at the moment it was added.
+  function addFiles(list: FileList | File[]) {
+    const added: UploadItem[] = Array.from(list).map((file) => {
+      const base = { id: crypto.randomUUID(), file, progress: 0, folderId: destination, folderLabel: destinationLabel };
+      if (file.size === 0) return { ...base, status: "error", error: "Empty files can't be uploaded." };
+      if (file.size > maxFileBytes) {
+        return { ...base, status: "error", error: `Too large — the limit is ${formatBytes(maxFileBytes)} per file.` };
+      }
+      return { ...base, status: "queued" };
+    });
+    setItems((all) => [...all, ...added]);
+  }
 
   const uploadOne = useCallback(
     async (item: UploadItem) => {
@@ -70,7 +106,7 @@ export default function UploadDialog({ maxFileBytes, folderId = null, folderName
         const initRes = await fetch("/api/files/upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: item.file.name, size: item.file.size, folderId }),
+          body: JSON.stringify({ name: item.file.name, size: item.file.size, folderId: item.folderId }),
         });
         const init = await initRes.json().catch(() => ({}));
         if (!initRes.ok) throw new Error(init.message || "Couldn't start the upload.");
@@ -115,7 +151,7 @@ export default function UploadDialog({ maxFileBytes, folderId = null, folderName
         update(item.id, { status: "error", error: error instanceof Error ? error.message : "Upload failed." });
       }
     },
-    [router, update, folderId]
+    [router, update]
   );
 
   // Simple scheduler: keep up to MAX_CONCURRENT uploads running.
@@ -162,7 +198,7 @@ export default function UploadDialog({ maxFileBytes, folderId = null, folderName
         onClose={() => setOpen(false)}
         size="lg"
         title="Upload files"
-        description={`${folderName ? `Into “${folderName}” · ` : ""}Photos, videos, documents, audio, archives and more · up to ${formatBytes(maxFileBytes)} per file`}
+        description={`Photos, videos, documents, audio, archives and more · up to ${formatBytes(maxFileBytes)} per file`}
         footer={
           <>
             {!inProgress && items.length > 0 && (
@@ -187,6 +223,45 @@ export default function UploadDialog({ maxFileBytes, folderId = null, folderName
           </>
         }
       >
+        <div className="mb-4">
+          {fixedFolder ? (
+            <p className="flex items-center gap-2 text-sm text-slate-600">
+              <FolderIcon width={16} height={16} className="shrink-0 text-amber-500" />
+              Saving to <span className="truncate font-semibold text-slate-900">{folderName ?? "this folder"}</span>
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <label htmlFor="upload-destination" className="block text-sm font-medium text-slate-700">
+                Save to
+              </label>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <select
+                  id="upload-destination"
+                  value={destination ?? ""}
+                  onChange={(e) => setDestination(e.target.value || null)}
+                  disabled={!folders && !foldersError}
+                  className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:bg-slate-50"
+                >
+                  <option value="">Top level (no folder)</option>
+                  {folderOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.path}
+                    </option>
+                  ))}
+                </select>
+                <InlineNewFolder
+                  onCreated={(folder) => {
+                    setFolders((list) => [...(list ?? []), folder]);
+                    setDestination(folder.id);
+                  }}
+                />
+              </div>
+              {!folders && !foldersError && <p className="text-xs text-slate-500">Loading folders…</p>}
+              {foldersError && <p className="text-xs font-medium text-red-600">{foldersError}</p>}
+            </div>
+          )}
+        </div>
+
         <div
           onDragOver={(e) => {
             e.preventDefault();
@@ -275,7 +350,7 @@ function statusText(item: UploadItem) {
     case "verifying":
       return `${size} · Checking file…`;
     case "done":
-      return `${size} · Uploaded`;
+      return `${size} · Uploaded${item.folderLabel ? ` to ${item.folderLabel}` : ""}`;
     case "cancelled":
       return `${size} · Cancelled`;
     case "error":
