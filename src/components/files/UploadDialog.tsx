@@ -269,7 +269,7 @@ export default function UploadDialog({ maxFileBytes, folderId = null, folderName
           }}
           onDragLeave={() => setDragging(false)}
           onDrop={onDrop}
-          className={`flex flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-10 text-center transition ${
+          className={`relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-10 text-center transition ${
             dragging ? "border-indigo-500 bg-indigo-50" : "border-slate-300 bg-slate-50"
           }`}
         >

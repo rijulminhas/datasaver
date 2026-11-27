@@ -228,7 +228,7 @@ function AddExistingFilesDialog({ folderId, folderName, onClose }: Props & { onC
           {visible.length === 0 ? (
             <p className="py-8 text-center text-sm text-slate-500">No files match your search.</p>
           ) : (
-            <ul className="max-h-[22rem] divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200" aria-label="Files">
+            <ul className="relative max-h-[22rem] divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200" aria-label="Files">
               {visible.map((file) => {
                 const checked = selected.has(file.id);
                 const Icon = CATEGORY_ICONS[file.category];
@@ -236,7 +236,7 @@ function AddExistingFilesDialog({ folderId, folderName, onClose }: Props & { onC
                 const location = file.folderId ? locations.get(file.folderId) ?? "Another folder" : "Top level";
                 return (
                   <li key={file.id}>
-                    <label className={`flex cursor-pointer items-center gap-3 px-3 py-2.5 transition ${checked ? "bg-indigo-50/60" : "hover:bg-slate-50"}`}>
+                    <label className={`relative flex cursor-pointer items-center gap-3 px-3 py-2.5 transition ${checked ? "bg-indigo-50/60" : "hover:bg-slate-50"}`}>
                       <input type="checkbox" checked={checked} onChange={() => toggle(file.id)} className="peer sr-only" />
                       <span
                         aria-hidden="true"
